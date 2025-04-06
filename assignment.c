@@ -3,7 +3,9 @@
 #include <stdlib.h>
 #include <float.h>
 
-#define IDX(x, y, z, NX, NY) ((z) * (NX) * (NY) + (y) * (NX) + (x))
+int global_idx(int x, int y, int z, int NX, int NY){
+  return z*NX*NY + y*NX + x;
+}
 
 void read_data(const char *filename, double *data, int total_points, int time_steps) {
     FILE *file = fopen(filename, "r");
@@ -27,24 +29,22 @@ void compute_local_extrema(double *sub_data, int nx, int ny, int nz, int nc, int
         for (int x = 0; x < nx; x++) {
             for (int y = 0; y < ny; y++) {
                 for (int z = 0; z < nz; z++) {
-                    int index = IDX(x, y, z, nx, ny) + t * (nx * ny * nz);
+                    int index = global_idx(x, y, z, nx, ny) + t * (nx * ny * nz);
                     double value = sub_data[index];
                     
                     if (value < global_min[t]) global_min[t] = value;
                     if (value > global_max[t]) global_max[t] = value;
                     
                     int is_min = 1, is_max = 1;
-                    for (int dx = -1; dx <= 1; dx++) {
-                        for (int dy = -1; dy <= 1; dy++) {
-                            for (int dz = -1; dz <= 1; dz++) {
-                                if (dx == 0 || dy == 0 || dz == 0) continue; // Consider only six neighbours
-                                int nx_pos = x + dx, ny_pos = y + dy, nz_pos = z + dz;
-                                if (nx_pos >= 0 && nx_pos < nx && ny_pos >= 0 && ny_pos < ny && nz_pos >= 0 && nz_pos < nz) {
-                                    int neighbor_index = IDX(nx_pos, ny_pos, nz_pos, nx, ny) + t * (nx * ny * nz);
-                                    if (sub_data[neighbor_index] <= value) is_min = 0;
-                                    if (sub_data[neighbor_index] >= value) is_max = 0;
-                                }
-                            }
+                    int dx[6] = {1, -1, 0, 0, 0, 0};
+                    int dy[6] = {0, 0, 1, -1, 0, 0};
+                    int dz[6] = {0, 0, 0, 0, 1, -1};
+                    for (int i = 0; i < 6; i++) {
+                        int nx_pos = x + dx[i], ny_pos = y + dy[i], nz_pos = z + dz[i];
+                        if (nx_pos >= 0 && nx_pos < nx && ny_pos >= 0 && ny_pos < ny && nz_pos >= 0 && nz_pos < nz) {
+                            int neighbor_index = global_idx(nx_pos, ny_pos, nz_pos, nx, ny) + t * (nx * ny * nz);
+                            if (sub_data[neighbor_index] <= value) is_min = 0;
+                            if (sub_data[neighbor_index] >= value) is_max = 0;
                         }
                     }
                     if (is_min) local_min_count[t]++;
