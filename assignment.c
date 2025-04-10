@@ -20,6 +20,31 @@ void read_data(const char *filename, double *data, int total_points,
   fclose(file);
 }
 
+void read_data_from_binary(const char *filename, double *data, int total_points,
+                           int time_steps) {
+  FILE *file = fopen(filename, "rb"); // open in binary mode
+  if (!file) {
+    fprintf(stderr, "Error opening file: %s\n", filename);
+    MPI_Abort(MPI_COMM_WORLD, 1);
+  }
+
+  float *temp = (float *)malloc(total_points * time_steps * sizeof(float));
+  size_t read_count =
+      fread(temp, sizeof(float), total_points * time_steps, file);
+  if (read_count != total_points * time_steps) {
+    fprintf(stderr, "Error reading binary file: expected %d floats, got %zu\n",
+            total_points * time_steps, read_count);
+    MPI_Abort(MPI_COMM_WORLD, 1);
+  }
+
+  // convert float to double
+  for (int i = 0; i < total_points * time_steps; i++) {
+    data[i] = (double)temp[i];
+  }
+
+  free(temp);
+  fclose(file);
+}
 void compute_local_extrema(double *sub_data, int nx, int ny, int nz, int nc,
                            int *local_min_count, int *local_max_count,
                            double *global_min, double *global_max) {
@@ -96,7 +121,7 @@ int main(int argc, char **argv) {
   double time1 = MPI_Wtime();
   if (rank == 0) {
     data = (double *)malloc(total_points * NC * sizeof(double));
-    read_data(input_file, data, total_points, NC);
+    read_data_from_binary(input_file, data, total_points, NC);
   }
 
   double time2 = MPI_Wtime();
