@@ -1,5 +1,6 @@
 #include <float.h>
 #include <mpi.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -7,19 +8,7 @@ int global_idx(int x, int y, int z, int NX, int NY) {
   return z * NX * NY + y * NX + x;
 }
 
-void read_data(const char *filename, double *data, int total_points,
-               int time_steps) {
-  FILE *file = fopen(filename, "r");
-  if (!file) {
-    fprintf(stderr, "Error opening file: %s\n", filename);
-    MPI_Abort(MPI_COMM_WORLD, 1);
-  }
-  for (int i = 0; i < total_points * time_steps; i++) {
-    fscanf(file, "%lf", &data[i]);
-  }
-  fclose(file);
-}
-
+/* read the data from the input binary file  */
 void read_data_from_binary(const char *filename, double *data, int total_points,
                            int time_steps) {
   FILE *file = fopen(filename, "rb"); // open in binary mode
@@ -45,6 +34,11 @@ void read_data_from_binary(const char *filename, double *data, int total_points,
   free(temp);
   fclose(file);
 }
+/* check if the point (x,y,z) lies within the subdomain of current process */
+bool isValid(int x, int y, int z, int nx, int ny, int nz) {
+  return x >= 0 && x < nx && y >= 0 && y < ny && z >= 0 && z < nz;
+}
+
 void compute_local_extrema(double *sub_data, int nx, int ny, int nz, int nc,
                            int *local_min_count, int *local_max_count,
                            double *global_min, double *global_max) {
@@ -71,15 +65,14 @@ void compute_local_extrema(double *sub_data, int nx, int ny, int nz, int nc,
           int dz[6] = {0, 0, 0, 0, 1, -1};
           for (int i = 0; i < 6; i++) {
             int nx_pos = x + dx[i], ny_pos = y + dy[i], nz_pos = z + dz[i];
-            if (nx_pos >= 0 && nx_pos < nx && ny_pos >= 0 && ny_pos < ny &&
-                nz_pos >= 0 && nz_pos < nz) {
-              int neighbor_index = global_idx(nx_pos, ny_pos, nz_pos, nx, ny) +
-                                   t * (nx * ny * nz);
-              if (sub_data[neighbor_index] <= value)
-                is_min = 0;
-              if (sub_data[neighbor_index] >= value)
-                is_max = 0;
-            }
+            if (!isValid(nx_pos, ny_pos, nz_pos, nx, ny, nz))
+              continue;
+            int neighbor_index =
+                global_idx(nx_pos, ny_pos, nz_pos, nx, ny) + t * (nx * ny * nz);
+            if (sub_data[neighbor_index] <= value)
+              is_min = 0;
+            if (sub_data[neighbor_index] >= value)
+              is_max = 0;
           }
           if (is_min)
             local_min_count[t]++;
