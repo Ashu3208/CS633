@@ -47,36 +47,41 @@ void compute_local_extrema(double *sub_data, int nx, int ny, int nz, int nc,
     global_max[t] = -DBL_MAX;
     local_min_count[t] = 0;
     local_max_count[t] = 0;
-
     for (int x = 0; x < nx; x++) {
       for (int y = 0; y < ny; y++) {
         for (int z = 0; z < nz; z++) {
+          // t * nx*ny*nz calculates the required offset to get the point for
+          // the current time step
           int index = global_idx(x, y, z, nx, ny) + t * (nx * ny * nz);
           double value = sub_data[index];
-
           if (value < global_min[t])
             global_min[t] = value;
           if (value > global_max[t])
             global_max[t] = value;
-
-          int is_min = 1, is_max = 1;
           int dx[6] = {1, -1, 0, 0, 0, 0};
           int dy[6] = {0, 0, 1, -1, 0, 0};
           int dz[6] = {0, 0, 0, 0, 1, -1};
+          bool is_minima = true, is_maxima = true;
+          // Iterating through all siz neighbours to check if it's a minima or
+          // maxima or neither
           for (int i = 0; i < 6; i++) {
             int nx_pos = x + dx[i], ny_pos = y + dy[i], nz_pos = z + dz[i];
             if (!isValid(nx_pos, ny_pos, nz_pos, nx, ny, nz))
               continue;
             int neighbor_index =
                 global_idx(nx_pos, ny_pos, nz_pos, nx, ny) + t * (nx * ny * nz);
+            // If atleast one neighbour has equal or smaller value, then it's
+            // not a local minima
             if (sub_data[neighbor_index] <= value)
-              is_min = 0;
+              is_minima = false;
+            // If atleast one neighbour has equal or greater value, then it's
+            // not a local maxima
             if (sub_data[neighbor_index] >= value)
-              is_max = 0;
+              is_maxima = false;
           }
-          if (is_min)
+          if (is_minima)
             local_min_count[t]++;
-          if (is_max)
+          if (is_maxima)
             local_max_count[t]++;
         }
       }
