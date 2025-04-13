@@ -116,12 +116,14 @@ int main(int argc, char **argv) {
   int sub_size = sub_nx * sub_ny * sub_nz;
 
   double *data = NULL;
+
+  // Process 0 reads data from the input files
   double time1 = MPI_Wtime();
   if (rank == 0) {
     data = (double *)malloc(total_points * NC * sizeof(double));
     read_data_from_binary(input_file, data, total_points, NC);
   }
-
+  // It then scatters the data to all other ranks
   double time2 = MPI_Wtime();
   double *sub_data = (double *)malloc(sub_size * NC * sizeof(double));
   MPI_Scatter(data, sub_size * NC, MPI_DOUBLE, sub_data, sub_size * NC,
@@ -132,6 +134,8 @@ int main(int argc, char **argv) {
   double *global_min = (double *)malloc(NC * sizeof(double));
   double *global_max = (double *)malloc(NC * sizeof(double));
 
+  // For each process, calculates the number of local minima, local maxima and
+  // global minima and maxima for that process
   compute_local_extrema(sub_data, sub_nx, sub_ny, sub_nz, NC, local_min_count,
                         local_max_count, global_min, global_max);
 
@@ -143,10 +147,16 @@ int main(int argc, char **argv) {
     final_min = (double *)malloc(NC * sizeof(double));
     final_max = (double *)malloc(NC * sizeof(double));
   }
+
+  // Total number of local minima and maxima would be the sum of count of all
+  // local minima and maxima for every process
   MPI_Reduce(local_min_count, total_min_count, NC, MPI_INT, MPI_SUM, 0,
              MPI_COMM_WORLD);
   MPI_Reduce(local_max_count, total_max_count, NC, MPI_INT, MPI_SUM, 0,
              MPI_COMM_WORLD);
+
+  // Global minima/maxima of the entire data would be the minimum/maximum of
+  // global min/max for each process
   MPI_Reduce(global_min, final_min, NC, MPI_DOUBLE, MPI_MIN, 0, MPI_COMM_WORLD);
   MPI_Reduce(global_max, final_max, NC, MPI_DOUBLE, MPI_MAX, 0, MPI_COMM_WORLD);
 
